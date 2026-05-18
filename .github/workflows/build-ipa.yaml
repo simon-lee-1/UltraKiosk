@@ -1,0 +1,59 @@
+name: Build Unsigned IPA
+
+on:
+  push:
+    branches:
+      - "ha-iphone-poc"
+      - "main"
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_16.4.app
+
+      - name: Xcode version
+        run: /usr/bin/xcodebuild -version
+
+      - name: Cache SPM packages
+        uses: actions/cache@v5
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('UltraKiosk.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Build unsigned archive
+        run: |
+          xcodebuild clean archive \
+            -project UltraKiosk.xcodeproj \
+            -scheme "UltraKiosk" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/UltraKiosk.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
+            OTHER_SWIFT_FLAGS="-D ED_SKIP_SWIFT_FORMAT"
+
+      - name: Package unsigned IPA from archive
+        run: |
+          mkdir -p build/Payload
+          cp -R build/UltraKiosk.xcarchive/Products/Applications/UltraKiosk.app build/Payload/
+          cd build
+          zip -qr UltraKiosk-unsigned.ipa Payload
+          ls -la UltraKiosk-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: UltraKiosk-unsigned-ipa-${{ github.run_number }}
+          path: build/UltraKiosk-unsigned.ipa
+          retention-days: 30

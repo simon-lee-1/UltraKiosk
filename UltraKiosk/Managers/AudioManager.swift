@@ -47,7 +47,7 @@ class AudioManager: NSObject, ObservableObject {
 
     private var silenceTimer: Timer?
     private var lastRecognizedText: String = ""
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(languageCode: "de"))
+    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-AU"))
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     
@@ -231,7 +231,7 @@ class AudioManager: NSObject, ObservableObject {
     
     func getBestVoce(prefix: String, language: String) -> AVSpeechSynthesisVoice? {
         let voices = AVSpeechSynthesisVoice.speechVoices()
-        let allVoices = voices.filter { $0.language.hasPrefix("de") }
+        let allVoices = voices.filter { $0.language.hasPrefix(prefix) }
         
         #if DEBUG
         AppLogger.speech.debug("=== Available German voices ===")
@@ -271,7 +271,7 @@ class AudioManager: NSObject, ObservableObject {
         }
         
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = getBestVoce(prefix: "de", language: "de-DE")
+        utterance.voice = getBestVoce(prefix: "en", language: language)
                
         // Sprechgeschwindigkeit (0.0 - 1.0, default: 0.5)
         utterance.rate = 0.5
@@ -309,17 +309,17 @@ class AudioManager: NSObject, ObservableObject {
                 do {
                     let response = try await self?.sendHomeAssistantConversation(
                         text: "\(self?.lastRecognizedText ?? "<unknown>")",
-                        language: "de"
+                        language: "en"
                     )
 
                     AppLogger.homeAssistant.info("Received conversation response")
-                    
-                    self?.speak(text: response ?? "Es ist ein Fehler passiert!", language: "de-DE")
-                   
+
+                    self?.speak(text: response ?? "Sorry, something went wrong.", language: "en-AU")
+
                 } catch {
                     AppLogger.homeAssistant.error("Home Assistant conversation error: \(error.localizedDescription)")
 
-                    self?.speak(text: "Es trat ein technischer Fehler auf. Bitte versuchen Sie es erneut!", language: "de-DE")
+                    self?.speak(text: "A technical error occurred. Please try again.", language: "en-AU")
                 }
             }
         }
