@@ -36,7 +36,6 @@ struct SettingsView: View {
                     Button("Save") {
                         saveAndClose()
                     }
-                    .fontWeight(.semibold)
                 }
             }
             .alert("Validation error", isPresented: $showingValidationAlert) {
@@ -495,7 +494,6 @@ struct URLListEditor: View {
                     committedInterval = interval
                     dismiss()
                 }
-                .fontWeight(.semibold)
             }
         }
     }
