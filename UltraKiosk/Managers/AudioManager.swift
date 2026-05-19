@@ -461,12 +461,16 @@ class AudioManager: NSObject, ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30
         
-        // Create the request body
+        // Create the request body.
+        // NB: When using Bedrock-backed Extended OpenAI Conversation, reusing the
+        // conversation_id triggers "conversation must start with a user message"
+        // (Bedrock strict ordering vs HA's stored history). Omit conversation_id
+        // entirely so HA generates a fresh one per turn. Trade-off: no multi-turn
+        // context. Fixable HA-side via litellm modify_params=True.
         let body: [String: Any] = [
             "text": text,
             "language": language,
-            "agent_id": settings.homeAssistantConversationAgent,
-            "conversation_id": settings.homeAssistantConversationId
+            "agent_id": settings.homeAssistantConversationAgent
         ]
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
