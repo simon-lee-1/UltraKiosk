@@ -448,7 +448,7 @@ struct URLListEditor: View {
 
     var body: some View {
         List {
-            Section("URLs") {
+            Section(header: Text("URLs")) {
                 ForEach(Array(urls.enumerated()), id: \.offset) { i, _ in
                     TextField("https://your-dashboard.local", text: $urls[i])
                         .keyboardType(.URL)
@@ -472,7 +472,10 @@ struct URLListEditor: View {
             }
 
             if urls.count > 1 {
-                Section {
+                Section(
+                    header: Text("Slideshow"),
+                    footer: Text("Time each slide is shown before cross-fading to the next.")
+                ) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Transition interval: \(Int(interval)) s")
                         Slider(value: $interval, in: 5...300, step: 5) {
@@ -483,10 +486,6 @@ struct URLListEditor: View {
                             Text("5 min")
                         }
                     }
-                } header: {
-                    Text("Slideshow")
-                } footer: {
-                    Text("Time each slide is shown before cross-fading to the next.")
                 }
             }
         }
