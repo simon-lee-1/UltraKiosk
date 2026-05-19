@@ -274,16 +274,46 @@ struct SettingsView: View {
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("Porcupine Access Token")
-                SecureField("Long-lived Access Token", text: $settings.porcupineAccessToken)
+                Text("Wake phrase")
+                TextField("hey casa", text: $settings.wakePhrase)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                Text("Create a Long-lived Access Token the Picovoice web console")
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                Text("SFSpeech listens for this phrase. Leave Porcupine token empty to use this path.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Conversation agent")
+                TextField("conversation.home_assistant", text: $settings.homeAssistantConversationAgent)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                Text("HA agent entity_id, e.g. conversation.home_assistant")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Conversation ID")
+                TextField("ipad", text: $settings.homeAssistantConversationId)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Porcupine Access Token (optional)")
+                SecureField("Leave empty to use SFSpeech wake word", text: $settings.porcupineAccessToken)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                Text("Picovoice removed permanent free tier. Leave empty unless you have a paid license.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
     }
-    
+
     private var kioskSection: some View {
         Section(header: Text("Kiosk mode")) {
             NavigationLink("Manage URLs (\(settings.slideshowURLs.count))") {

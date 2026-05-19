@@ -42,7 +42,7 @@ class SettingsManager: ObservableObject {
     @Published var porcupineAccessToken: String = "" // Empty: SFSpeech wake word path. Set this to fall back to Porcupine.
     @Published var wakePhrase: String = "hey casa"
     @Published var voiceLanguage: String = "en"
-    @Published var homeAssistantConversationAgent: String = "conversation.claude_conversation"
+    @Published var homeAssistantConversationAgent: String = "conversation.home_assistant"
     @Published var homeAssistantConversationId: String = "ipad"
     
     // MARK: - UserDefaults Keys
@@ -213,7 +213,7 @@ class SettingsManager: ObservableObject {
             .string(forKey: Keys.voiceLanguage) ?? "en"
 
         homeAssistantConversationAgent = defaults
-            .string(forKey: Keys.homeAssistantConversationAgent) ?? "conversation.claude_conversation"
+            .string(forKey: Keys.homeAssistantConversationAgent) ?? "conversation.home_assistant"
 
         homeAssistantConversationId = defaults
             .string(forKey: Keys.homeAssistantConversationId) ?? "ipad"
@@ -394,6 +394,7 @@ class SettingsManager: ObservableObject {
     
     // MARK: - Reset
     func resetToDefaults() {
+        wakePhrase = "hey casa"
         homeAssistantIP = "homeassistant.local"
         homeAssistantPort = "8123"
         accessToken = ""
@@ -418,10 +419,11 @@ class SettingsManager: ObservableObject {
         // Voice pipeline defaults
         voiceSampleRate = 16000
         voiceTimeout = 2
-        
-        voiceLanguage = "de"
+
+        voiceLanguage = "en"
+        wakePhrase = "hey casa"
         homeAssistantConversationId = "ipad"
-        homeAssistantConversationAgent = "conversation.claude_conversation"
+        homeAssistantConversationAgent = "conversation.home_assistant"
 
         slideshowURLs = []
         slideshowInterval = 30.0
