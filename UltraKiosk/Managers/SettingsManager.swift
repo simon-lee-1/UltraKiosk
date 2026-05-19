@@ -42,7 +42,7 @@ class SettingsManager: ObservableObject {
     @Published var porcupineAccessToken: String = "" // Empty: SFSpeech wake word path. Set this to fall back to Porcupine.
     @Published var wakePhrase: String = "hey casa"
     @Published var voiceLanguage: String = "en"
-    @Published var homeAssistantConversationAgent: String = "conversation.home_assistant"
+    @Published var homeAssistantConversationAgent: String = "conversation.extended_openai_conversation"
     @Published var homeAssistantConversationId: String = "ipad"
     
     // MARK: - UserDefaults Keys
@@ -213,7 +213,7 @@ class SettingsManager: ObservableObject {
             .string(forKey: Keys.voiceLanguage) ?? "en"
 
         homeAssistantConversationAgent = defaults
-            .string(forKey: Keys.homeAssistantConversationAgent) ?? "conversation.home_assistant"
+            .string(forKey: Keys.homeAssistantConversationAgent) ?? "conversation.extended_openai_conversation"
 
         homeAssistantConversationId = defaults
             .string(forKey: Keys.homeAssistantConversationId) ?? "ipad"
@@ -423,7 +423,7 @@ class SettingsManager: ObservableObject {
         voiceLanguage = "en"
         wakePhrase = "hey casa"
         homeAssistantConversationId = "ipad"
-        homeAssistantConversationAgent = "conversation.home_assistant"
+        homeAssistantConversationAgent = "conversation.extended_openai_conversation"
 
         slideshowURLs = []
         slideshowInterval = 30.0
