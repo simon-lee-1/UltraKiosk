@@ -55,7 +55,7 @@ struct SettingsView: View {
     }
     
     private var mqttSection: some View {
-        Section("MQTT Integration") {
+        Section(header: Text("MQTT Integration")) {
             Toggle("Enable MQTT", isOn: $settings.enableMQTT)
             
             if settings.enableMQTT {
@@ -154,7 +154,7 @@ struct SettingsView: View {
     }
     
     private var homeAssistantSection: some View {
-        Section("Home Assistant") {
+        Section(header: Text("Home Assistant")) {
             HStack {
                 Text("IP/Name")
                 Spacer()
@@ -205,7 +205,7 @@ struct SettingsView: View {
     }
     
     private var screensaverSection: some View {
-        Section("Screensaver") {
+        Section(header: Text("Screensaver")) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Inactivity timeout: \(settings.screensaverTimeoutFormatted)")
                 Slider(value: $settings.screensaverTimeout, in: 10...1800, step: 10) {
@@ -241,7 +241,7 @@ struct SettingsView: View {
     }
     
     private var voiceSection: some View {
-        Section("Voice control") {
+        Section(header: Text("Voice control")) {
             Toggle("Enable voice activation", isOn: $settings.enableVoiceActivation)
             
             VStack(alignment: .leading, spacing: 8) {
@@ -275,7 +275,7 @@ struct SettingsView: View {
     }
     
     private var kioskSection: some View {
-        Section("Kiosk mode") {
+        Section(header: Text("Kiosk mode")) {
             NavigationLink("Manage URLs (\(settings.slideshowURLs.count))") {
                 URLListEditor(
                     committedURLs: $settings.slideshowURLs,
@@ -291,7 +291,7 @@ struct SettingsView: View {
     }
     
     private var actionsSection: some View {
-        Section("Actions") {
+        Section(header: Text("Actions")) {
             Button("Reset settings") {
                 showingResetAlert = true
             }
@@ -427,7 +427,7 @@ struct URLListEditor: View {
     @State private var urls: [String]
     @State private var interval: Double
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) private var presentationMode
 
     init(committedURLs: Binding<[String]>, committedInterval: Binding<Double>) {
         _committedURLs = committedURLs
@@ -483,7 +483,7 @@ struct URLListEditor: View {
         .navigationTitle("Slideshow URLs")
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button("Cancel") { dismiss() }
+                Button("Cancel") { presentationMode.wrappedValue.dismiss() }
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 EditButton()
@@ -492,7 +492,7 @@ struct URLListEditor: View {
                 Button("Save") {
                     committedURLs = urls
                     committedInterval = interval
-                    dismiss()
+                    presentationMode.wrappedValue.dismiss()
                 }
             }
         }

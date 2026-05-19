@@ -37,8 +37,13 @@ class FaceDetectionManager: NSObject, ObservableObject {
             }
         }
         
-        // Use the latest revision for best performance
-        request.revision = VNDetectFaceRectanglesRequestRevision3
+        // Use the latest revision for best performance.
+        // Revision3 is iOS 15+; fall back to Revision2 on iOS 14.
+        if #available(iOS 15.0, *) {
+            request.revision = VNDetectFaceRectanglesRequestRevision3
+        } else {
+            request.revision = VNDetectFaceRectanglesRequestRevision2
+        }
         
         return request
     }()
