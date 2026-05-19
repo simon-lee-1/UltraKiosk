@@ -39,8 +39,9 @@ class SettingsManager: ObservableObject {
     // Voice pipeline settings
     @Published var voiceSampleRate: Int = 16000
     @Published var voiceTimeout: Int = 2
-    @Published var porcupineAccessToken: String = "YTvBtr2dk1wvG5ZeOqT5Gg8Ui2gMGy/qaeTLst0dPBBpxuJK2vkDqg=="
-    @Published var voiceLanguage: String = "de"
+    @Published var porcupineAccessToken: String = "" // Empty: SFSpeech wake word path. Set this to fall back to Porcupine.
+    @Published var wakePhrase: String = "hey casa"
+    @Published var voiceLanguage: String = "en"
     @Published var homeAssistantConversationAgent: String = "conversation.claude_conversation"
     @Published var homeAssistantConversationId: String = "ipad"
     
@@ -67,6 +68,7 @@ class SettingsManager: ObservableObject {
         static let voiceSampleRate = "voiceSampleRate"
         static let voiceTimeout = "voiceTimeout"
         static let porcupineAccessToken = "porcupineAccessToken"
+        static let wakePhrase = "wakePhrase"
         static let voiceLanguage = "voiceLanguage"
         static let homeAssistantConversationAgent = "homeAssistantConversationAgent"
         static let homeAssistantConversationId = "homeAssistantConversationId"
@@ -203,10 +205,12 @@ class SettingsManager: ObservableObject {
         }
         
         porcupineAccessToken = defaults
-            .string(forKey: Keys.porcupineAccessToken) ?? "YTvBtr2dk1wvG5ZeOqT5Gg8Ui2gMGy/qaeTLst0dPBBpxuJK2vkDqg=="
+            .string(forKey: Keys.porcupineAccessToken) ?? ""
+
+        wakePhrase = defaults.string(forKey: Keys.wakePhrase) ?? "hey casa"
 
         voiceLanguage = defaults
-            .string(forKey: Keys.voiceLanguage) ?? "de"
+            .string(forKey: Keys.voiceLanguage) ?? "en"
 
         homeAssistantConversationAgent = defaults
             .string(forKey: Keys.homeAssistantConversationAgent) ?? "conversation.claude_conversation"
@@ -267,6 +271,7 @@ class SettingsManager: ObservableObject {
         defaults.set(voiceSampleRate, forKey: Keys.voiceSampleRate)
         defaults.set(voiceTimeout, forKey: Keys.voiceTimeout)
         defaults.set(porcupineAccessToken, forKey: Keys.porcupineAccessToken)
+        defaults.set(wakePhrase, forKey: Keys.wakePhrase)
         defaults.set(homeAssistantConversationAgent, forKey: Keys.homeAssistantConversationAgent)
         defaults.set(homeAssistantConversationId, forKey: Keys.homeAssistantConversationId)
         defaults.set(voiceLanguage, forKey: Keys.voiceLanguage)

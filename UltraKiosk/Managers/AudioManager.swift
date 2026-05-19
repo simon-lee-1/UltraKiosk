@@ -50,6 +50,15 @@ class AudioManager: NSObject, ObservableObject {
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-AU"))
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+
+    // SFSpeech-based wake word listener (used when Porcupine access key is empty).
+    // Runs a continuous on-device recognition session and scans partial results
+    // for the configured wake phrase. iOS limits recognition sessions to ~1 minute
+    // so the listener auto-restarts.
+    private var wakeRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var wakeTask: SFSpeechRecognitionTask?
+    private var wakeRestartTimer: Timer?
+    private var wakeListenerActive = false
     
     private let synthesizer = AVSpeechSynthesizer()
     private var currentUtterance: AVSpeechUtterance?
@@ -173,8 +182,10 @@ class AudioManager: NSObject, ObservableObject {
         // Prevent microphone monitoring through speakers while still allowing taps to receive data
         audioEngine.mainMixerNode.outputVolume = 0
         
-        // Init Porcupine only if an access key is configured.
-        // When empty, the app runs in push-to-talk mode (call triggerListening()).
+        // Wake word strategy:
+        //   - If Porcupine access key is set, use Porcupine (low CPU, dedicated wake-word DSP).
+        //   - Otherwise use SFSpeech continuous mode listening for settings.wakePhrase.
+        // Push-to-talk via triggerListening() always works regardless.
         let key = settings.porcupineAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
         if !key.isEmpty {
             do {
@@ -187,7 +198,7 @@ class AudioManager: NSObject, ObservableObject {
                 AppLogger.audio.error("Failed to initialize Porcupine: \(String(describing: error))")
             }
         } else {
-            AppLogger.audio.info("Porcupine access key empty - running in push-to-talk mode")
+            AppLogger.audio.info("Porcupine key empty - using SFSpeech wake-word listener")
         }
         
         // Install tap on mixer so we receive buffers in the desired format (engine converts)
@@ -203,21 +214,108 @@ class AudioManager: NSObject, ObservableObject {
         } catch {
             AppLogger.audio.error("Failed to start audio engine: \(String(describing: error))")
         }
+
+        // If Porcupine isn't loaded, start the SFSpeech wake-word listener.
+        if porcupine == nil {
+            startWakeListener()
+        }
     }
-    
+
     func stopRecording() {
+        stopWakeListener()
         audioEngine?.stop()
 
         mixerNode?.removeTap(onBus: 0)
         mixerNode = nil
         inputNode = nil
         audioEngine = nil
-        
+
         porcupine?.delete()
         porcupine = nil;
-        
+
         DispatchQueue.main.async {
             self.isRecording = false
+        }
+    }
+
+    // MARK: - SFSpeech wake-word listener
+
+    /// Starts a long-running SFSpeech recognition session that scans partial
+    /// transcripts for `settings.wakePhrase`. iOS limits a single session to
+    /// ~1 minute so we restart it on a timer.
+    private func startWakeListener() {
+        guard speechRecognizer?.isAvailable == true else {
+            AppLogger.speech.error("Wake listener: SFSpeechRecognizer unavailable")
+            return
+        }
+        wakeListenerActive = true
+        scheduleWakeRestart()
+        startWakeSession()
+    }
+
+    private func stopWakeListener() {
+        wakeListenerActive = false
+        wakeRestartTimer?.invalidate()
+        wakeRestartTimer = nil
+        wakeRequest?.endAudio()
+        wakeRequest = nil
+        wakeTask?.cancel()
+        wakeTask = nil
+    }
+
+    private func scheduleWakeRestart() {
+        wakeRestartTimer?.invalidate()
+        // 50s — comfortably under iOS' ~60s session limit.
+        wakeRestartTimer = Timer.scheduledTimer(withTimeInterval: 50.0, repeats: true) { [weak self] _ in
+            self?.restartWakeSession()
+        }
+    }
+
+    private func restartWakeSession() {
+        guard wakeListenerActive else { return }
+        AppLogger.speech.debug("Wake listener: restarting session (iOS time limit)")
+        wakeRequest?.endAudio()
+        wakeRequest = nil
+        wakeTask?.cancel()
+        wakeTask = nil
+        startWakeSession()
+    }
+
+    private func startWakeSession() {
+        guard wakeListenerActive else { return }
+        guard recognitionRequest == nil else {
+            // A command-capture session is in flight; the wake listener resumes
+            // automatically when that finishes.
+            return
+        }
+        let req = SFSpeechAudioBufferRecognitionRequest()
+        req.shouldReportPartialResults = true
+        req.requiresOnDeviceRecognition = true
+        wakeRequest = req
+
+        wakeTask = speechRecognizer?.recognitionTask(with: req) { [weak self] result, error in
+            guard let self = self else { return }
+
+            if let result = result {
+                let heard = result.bestTranscription.formattedString
+                let phrase = self.settings.wakePhrase.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                if !phrase.isEmpty && heard.lowercased().contains(phrase) {
+                    AppLogger.speech.info("Wake phrase detected in stream: \(heard)")
+                    // Tear down wake session and switch to command capture.
+                    self.wakeRequest?.endAudio()
+                    self.wakeRequest = nil
+                    self.wakeTask?.cancel()
+                    self.wakeTask = nil
+                    DispatchQueue.main.async {
+                        self.startListening()
+                    }
+                    return
+                }
+            }
+            if error != nil {
+                AppLogger.speech.debug("Wake listener task error: \(String(describing: error))")
+                // Don't auto-restart on error; the periodic timer handles that.
+            }
         }
     }
     
@@ -328,6 +426,16 @@ class AudioManager: NSObject, ObservableObject {
 
                     self?.speak(text: "A technical error occurred. Please try again.", language: "en-AU")
                 }
+
+                // Resume wake-word listening once command processing kicked off.
+                // The synthesizer's didFinish delegate also restarts recording,
+                // but we want the wake listener up immediately on tasks that
+                // bypass speech.
+                if let self = self, self.porcupine == nil, self.wakeListenerActive {
+                    DispatchQueue.main.async {
+                        self.startWakeSession()
+                    }
+                }
             }
         }
     }
@@ -404,6 +512,12 @@ class AudioManager: NSObject, ObservableObject {
 
         if let request = recognitionRequest {
             request.append(buffer)
+            return
+        }
+
+        // Feed wake-word recognition session if active.
+        if let wake = wakeRequest {
+            wake.append(buffer)
             return
         }
 
