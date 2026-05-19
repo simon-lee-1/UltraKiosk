@@ -275,7 +275,7 @@ struct SettingsView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("Wake phrase")
-                TextField("hey casa", text: $settings.wakePhrase)
+                TextField("hey homa", text: $settings.wakePhrase)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .autocapitalization(.none)
                     .disableAutocorrection(true)

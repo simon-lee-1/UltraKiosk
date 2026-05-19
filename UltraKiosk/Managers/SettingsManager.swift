@@ -40,7 +40,7 @@ class SettingsManager: ObservableObject {
     @Published var voiceSampleRate: Int = 16000
     @Published var voiceTimeout: Int = 2
     @Published var porcupineAccessToken: String = "" // Empty: SFSpeech wake word path. Set this to fall back to Porcupine.
-    @Published var wakePhrase: String = "hey casa"
+    @Published var wakePhrase: String = "hey homa"
     @Published var voiceLanguage: String = "en"
     @Published var homeAssistantConversationAgent: String = "conversation.extended_openai_conversation"
     @Published var homeAssistantConversationId: String = "ipad"
@@ -207,7 +207,7 @@ class SettingsManager: ObservableObject {
         porcupineAccessToken = defaults
             .string(forKey: Keys.porcupineAccessToken) ?? ""
 
-        wakePhrase = defaults.string(forKey: Keys.wakePhrase) ?? "hey casa"
+        wakePhrase = defaults.string(forKey: Keys.wakePhrase) ?? "hey homa"
 
         voiceLanguage = defaults
             .string(forKey: Keys.voiceLanguage) ?? "en"
@@ -394,7 +394,7 @@ class SettingsManager: ObservableObject {
     
     // MARK: - Reset
     func resetToDefaults() {
-        wakePhrase = "hey casa"
+        wakePhrase = "hey homa"
         homeAssistantIP = "homeassistant.local"
         homeAssistantPort = "8123"
         accessToken = ""
@@ -421,7 +421,7 @@ class SettingsManager: ObservableObject {
         voiceTimeout = 2
 
         voiceLanguage = "en"
-        wakePhrase = "hey casa"
+        wakePhrase = "hey homa"
         homeAssistantConversationId = "ipad"
         homeAssistantConversationAgent = "conversation.extended_openai_conversation"
 
