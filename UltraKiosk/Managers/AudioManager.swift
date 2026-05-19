@@ -290,7 +290,11 @@ class AudioManager: NSObject, ObservableObject {
         }
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
-        req.requiresOnDeviceRecognition = true
+        // On-device recognition for streaming audio requires A12+ (iPhone XS+).
+        // Older devices (iPhone 6s/A9) silently fail with on-device=true; fall back to cloud.
+        if speechRecognizer?.supportsOnDeviceRecognition == true {
+            req.requiresOnDeviceRecognition = true
+        }
         wakeRequest = req
 
         wakeTask = speechRecognizer?.recognitionTask(with: req) { [weak self] result, error in
@@ -583,7 +587,10 @@ class AudioManager: NSObject, ObservableObject {
         }
 
         recognitionRequest.shouldReportPartialResults = true
-        recognitionRequest.requiresOnDeviceRecognition = true
+        // Same compat: only request on-device if device supports streaming on-device STT.
+        if speechRecognizer?.supportsOnDeviceRecognition == true {
+            recognitionRequest.requiresOnDeviceRecognition = true
+        }
 
         lastRecognizedText = ""
         resetSilenceTimer()
