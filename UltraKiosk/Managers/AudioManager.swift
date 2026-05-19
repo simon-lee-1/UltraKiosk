@@ -173,14 +173,21 @@ class AudioManager: NSObject, ObservableObject {
         // Prevent microphone monitoring through speakers while still allowing taps to receive data
         audioEngine.mainMixerNode.outputVolume = 0
         
-        // Init porcupine
-        do {
-            porcupine = try Porcupine(
-                accessKey: settings.porcupineAccessToken,
-                keywords: [Porcupine.BuiltInKeyword.alexa],
-            )
-        } catch {
-            AppLogger.audio.error("Failed to initialize Porcupine: \(String(describing: error))")
+        // Init Porcupine only if an access key is configured.
+        // When empty, the app runs in push-to-talk mode (call triggerListening()).
+        let key = settings.porcupineAccessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !key.isEmpty {
+            do {
+                porcupine = try Porcupine(
+                    accessKey: key,
+                    keywords: [Porcupine.BuiltInKeyword.alexa],
+                )
+                AppLogger.audio.info("Porcupine wake word enabled")
+            } catch {
+                AppLogger.audio.error("Failed to initialize Porcupine: \(String(describing: error))")
+            }
+        } else {
+            AppLogger.audio.info("Porcupine access key empty - running in push-to-talk mode")
         }
         
         // Install tap on mixer so we receive buffers in the desired format (engine converts)
@@ -394,89 +401,106 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
-        
+
         if let request = recognitionRequest {
             request.append(buffer)
             return
         }
-        
+
         guard let porcupine = porcupine,
           let floatChannelData = buffer.floatChannelData else {
             return
         }
-                
+
         let frameLength = Int(buffer.frameLength)
         let channelData = floatChannelData[0] // Use first channel (mono)
-                
+
         // Convert float samples (-1.0 to 1.0) to Int16 (-32768 to 32767)
         let samplesArray = Array(UnsafeBufferPointer(start: channelData, count: frameLength))
         let int16Samples = convertFloatToInt16(floatSamples: samplesArray)
-                
+
         // Add samples to our buffer
         audioBuffer.append(contentsOf: int16Samples)
-                
+
         // Process in chunks of Porcupine frame length
         let frameSize = Int(Porcupine.frameLength)
-                
+
         while audioBuffer.count >= frameSize {
             // Extract one frame worth of samples
             let frame = Array(audioBuffer.prefix(frameSize))
             audioBuffer.removeFirst(frameSize)
-                    
+
             // Process the frame with Porcupine
             do {
                 let keywordIndex = try porcupine.process(pcm: frame)
                 if keywordIndex >= 0 {
                     AppLogger.speech.info("Wake word detected! Keyword index: \(keywordIndex)")
-                    
-                    playFeedbackSound(assetName: "Speech_On", assetExtension: "wav")
-                    
-                    // Recognition Task starten
-                    recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-                    guard let recognitionRequest = recognitionRequest else {
-                        throw NSError(domain: "SpeechRecognizer", code: -1,
-                                     userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"])
-                    }
-                    
-                    // Ergebnisse während der Aufnahme liefern
-                    recognitionRequest.shouldReportPartialResults = true
-                    recognitionRequest.requiresOnDeviceRecognition = true
-                    
-                    lastRecognizedText = ""
-
-                    recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-                        var isFinal = false
-                        
-                        if let result = result {
-                            let recognizedText = result.bestTranscription.formattedString
-                            AppLogger.speech.debug("Recognized text: \(recognizedText)")
-                            
-                            self?.lastRecognizedText = recognizedText
-                            self?.resetSilenceTimer()
-                            
-                            isFinal = result.isFinal
-                        }
-                        
-                        if error != nil || isFinal {
-                            self?.recognitionRequest?.endAudio()
-                            self?.recognitionRequest = nil
-                            self?.recognitionTask = nil
-                            self?.silenceTimer?.invalidate()
-                            self?.silenceTimer = nil
-                            
-                            if let error = error {
-                                AppLogger.speech.error("Speech recognition error: \(error.localizedDescription)")
-                            }
-                        }
-                    }
-                    
-                    AppLogger.speech.info("Speech recognition task started")
+                    startListening()
                     return
                 }
             } catch {
                 AppLogger.audio.error("Porcupine processing error: \(error.localizedDescription)")
             }
         }
+    }
+
+    /// Public push-to-talk entry point. Begins SFSpeech recognition session as if a wake word fired.
+    /// Safe to call from UI button. No-op if a session is already active or recording is off.
+    func triggerListening() {
+        guard isRecording else {
+            AppLogger.speech.warning("triggerListening called but recording is off")
+            return
+        }
+        guard recognitionRequest == nil else {
+            AppLogger.speech.debug("triggerListening ignored - session already active")
+            return
+        }
+        AppLogger.speech.info("Push-to-talk triggered")
+        startListening()
+    }
+
+    private func startListening() {
+        playFeedbackSound(assetName: "Speech_On", assetExtension: "wav")
+
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognitionRequest = recognitionRequest else {
+            AppLogger.speech.error("Unable to create recognition request")
+            return
+        }
+
+        recognitionRequest.shouldReportPartialResults = true
+        recognitionRequest.requiresOnDeviceRecognition = true
+
+        lastRecognizedText = ""
+        resetSilenceTimer()
+
+        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            var isFinal = false
+
+            if let result = result {
+                let recognizedText = result.bestTranscription.formattedString
+                AppLogger.speech.debug("Recognized text: \(recognizedText)")
+
+                self?.lastRecognizedText = recognizedText
+                self?.resetSilenceTimer()
+
+                isFinal = result.isFinal
+            }
+
+            if error != nil || isFinal {
+                self?.recognitionRequest?.endAudio()
+                self?.recognitionRequest = nil
+                self?.recognitionTask = nil
+                self?.silenceTimer?.invalidate()
+                self?.silenceTimer = nil
+
+                if let error = error {
+                    AppLogger.speech.error("Speech recognition error: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        AppLogger.speech.info("Speech recognition task started")
     }
     
     // Plays an MP3 from a remote or local URL using AVPlayer

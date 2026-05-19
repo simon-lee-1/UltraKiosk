@@ -66,6 +66,29 @@ struct ContentView: View {
                 }
                 Spacer()
             }
+
+            // Push-to-talk button (always visible when voice is enabled)
+            if settings.enableVoiceActivation {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            audioManager.triggerListening()
+                        } label: {
+                            Image(systemName: audioManager.isRecording ? "mic.circle.fill" : "mic.slash.circle.fill")
+                                .resizable()
+                                .frame(width: 64, height: 64)
+                                .foregroundColor(audioManager.isRecording ? .blue : .gray)
+                                .background(Color.white.opacity(0.7))
+                                .clipShape(Circle())
+                                .shadow(radius: 4)
+                        }
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 24)
+                    }
+                }
+            }
         }
         .onAppear {
             setupApp()
