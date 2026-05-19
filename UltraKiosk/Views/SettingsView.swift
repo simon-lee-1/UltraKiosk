@@ -3,11 +3,15 @@ import CocoaMQTT
 
 // MARK: - Settings View
 struct SettingsView: View {
+    enum ActiveAlert: Identifiable {
+        case validation, reset
+        var id: Int { self == .validation ? 0 : 1 }
+    }
+
     @ObservedObject var settings = SettingsManager.shared
     @Environment(\.presentationMode) var presentationMode
-    @State private var showingValidationAlert = false
+    @State private var activeAlert: ActiveAlert?
     @State private var validationIssues: [String] = []
-    @State private var showingResetAlert = false
     @State private var testConnectionResult = ""
     @State private var isTestingConnection = false
     
@@ -38,18 +42,24 @@ struct SettingsView: View {
                     }
                 }
             }
-            .alert("Validation error", isPresented: $showingValidationAlert) {
-                Button("OK") { }
-            } message: {
-                Text(validationIssues.joined(separator: "\n"))
-            }
-            .alert("Reset settings", isPresented: $showingResetAlert) {
-                Button("Cancel", role: .cancel) { }
-                Button("Reset", role: .destructive) {
-                    settings.resetToDefaults()
+            .alert(item: $activeAlert) { alert in
+                switch alert {
+                case .validation:
+                    return Alert(
+                        title: Text("Validation error"),
+                        message: Text(validationIssues.joined(separator: "\n")),
+                        dismissButton: .default(Text("OK"))
+                    )
+                case .reset:
+                    return Alert(
+                        title: Text("Reset settings"),
+                        message: Text("Do you want to reset all settings to the default values?"),
+                        primaryButton: .destructive(Text("Reset")) {
+                            settings.resetToDefaults()
+                        },
+                        secondaryButton: .cancel()
+                    )
                 }
-            } message: {
-                Text("Do you want to reset all settings to the default values?")
             }
         }
     }
@@ -293,7 +303,7 @@ struct SettingsView: View {
     private var actionsSection: some View {
         Section(header: Text("Actions")) {
             Button("Reset settings") {
-                showingResetAlert = true
+                activeAlert = .reset
             }
             .foregroundColor(.red)
             
@@ -311,7 +321,7 @@ struct SettingsView: View {
             settings.saveSettings() // Save settings explicitly
             presentationMode.wrappedValue.dismiss()
         } else {
-            showingValidationAlert = true
+            activeAlert = .validation
         }
     }
     
