@@ -38,7 +38,7 @@ class SettingsManager: ObservableObject {
     
     // Voice pipeline settings
     @Published var voiceSampleRate: Int = 16000
-    @Published var voiceTimeout: Int = 2
+    @Published var voiceTimeout: Int = 5
     @Published var porcupineAccessToken: String = "" // Empty: SFSpeech wake word path. Set this to fall back to Porcupine.
     @Published var wakePhrase: String = "hey homa"
     @Published var voiceLanguage: String = "en"
@@ -201,7 +201,7 @@ class SettingsManager: ObservableObject {
         if let to = defaults.object(forKey: Keys.voiceTimeout) as? Int {
             voiceTimeout = to
         } else {
-            voiceTimeout = 2
+            voiceTimeout = 5
         }
         
         porcupineAccessToken = defaults
@@ -418,7 +418,7 @@ class SettingsManager: ObservableObject {
         
         // Voice pipeline defaults
         voiceSampleRate = 16000
-        voiceTimeout = 2
+        voiceTimeout = 5
 
         voiceLanguage = "en"
         wakePhrase = "hey homa"

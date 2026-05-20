@@ -112,9 +112,9 @@ class AudioManager: NSObject, ObservableObject {
             NotificationCenter.default.removeObserver(observer)
             playbackObserver = nil
         }
-        
+
         player = nil
-        
+
         // Restore audio session for recording
         do {
             let session = AVAudioSession.sharedInstance()
@@ -125,11 +125,19 @@ class AudioManager: NSObject, ObservableObject {
         } catch {
             AppLogger.audio.error("Failed to restore audio session after playback: \(String(describing: error))")
         }
-        
+
+        // If a command recognition session is in flight, the audio engine is still
+        // running and feeding it buffers. Tearing it down here would kill the just-
+        // started recognition task (manifests as the "off" chime firing immediately
+        // after the "on" chime on push-to-talk). Just restore output routing.
+        if recognitionRequest != nil {
+            return
+        }
+
         // Resume recording if it was active before playback
         if isRecording {
             stopRecording()
-            
+
             // Give a small delay to ensure cleanup is complete
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.startRecording()
@@ -246,6 +254,16 @@ class AudioManager: NSObject, ObservableObject {
     private func startWakeListener() {
         guard speechRecognizer?.isAvailable == true else {
             AppLogger.speech.error("Wake listener: SFSpeechRecognizer unavailable")
+            return
+        }
+        // Continuous wake-word listening relies on on-device streaming STT
+        // (A12+, iPhone XS or newer). On A9/A10 devices Apple's cloud STT is
+        // used instead, which doesn't reliably emit partial results during
+        // streaming and quickly hits rate limits with 50s session restarts
+        // (~72 requests/hour). Disable the wake listener on those devices and
+        // require push-to-talk instead.
+        guard speechRecognizer?.supportsOnDeviceRecognition == true else {
+            AppLogger.speech.warning("Wake listener disabled: device lacks on-device streaming STT (A9/A10). Use push-to-talk.")
             return
         }
         wakeListenerActive = true
@@ -409,15 +427,29 @@ class AudioManager: NSObject, ObservableObject {
             self?.recognitionTask = nil
             self?.silenceTimer?.invalidate()
             self?.silenceTimer = nil
-            
+
+            let trimmedText = (self?.lastRecognizedText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
             AppLogger.speech.info("Voice session ended due to inactivity. Last text: \(self?.lastRecognizedText ?? "<none>")")
-            
+
             self?.playFeedbackSound(assetName: "Speech_Off", assetExtension: "wav")
-            
+
+            // Guard: if no text was recognized, don't send an empty payload to HA
+            // (Bedrock-backed Extended OpenAI Conversation 400s on empty user messages).
+            guard !trimmedText.isEmpty else {
+                AppLogger.speech.info("No speech recognized; skipping HA call and resuming wake listener")
+                if let self = self, self.porcupine == nil, self.wakeListenerActive {
+                    DispatchQueue.main.async {
+                        self.startWakeSession()
+                    }
+                }
+                return
+            }
+
             Task {
                 do {
                     let response = try await self?.sendHomeAssistantConversation(
-                        text: "\(self?.lastRecognizedText ?? "<unknown>")",
+                        text: trimmedText,
                         language: "en"
                     )
 
